@@ -24,12 +24,12 @@ app.add_middleware(
 session_id = str(uuid.uuid4())
 
 @app.post("/chat")
-def chat(request: Request):
-    data = request.json()
+async def chat(request: Request):
+    data = await request.json()
     message = data.get("message", "")
     if not message:
         return {"error": "Message parameter is required"}
-    return stream_openai_response(message, session_id)
+    return await stream_openai_response(message, session_id)
 
 @app.get("/")
 def home():
