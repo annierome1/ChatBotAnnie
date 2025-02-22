@@ -7,13 +7,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load environment variables
+# Load environment variables (ensure these are set in your .env and Railway environment)
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
-# Initialize Pinecone
-pinecone.init(api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENVIRONMENT"))
-index = pinecone.Index(os.getenv("PINECONE_INDEX_NAME"))
+# Initialize the new Pinecone client
+client = pinecone.Client(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+
+# Create the index if it doesn't exist
+if PINECONE_INDEX_NAME not in client.list_indexes():
+    client.create_index(
+        name=PINECONE_INDEX_NAME,
+        dimension=1536,  # for OpenAI text-embedding-ada-002
+        metric="cosine"
+    )
+
+# Get a reference to the index
+index = client.Index(PINECONE_INDEX_NAME)
+
+# Get a reference to your index
+index = pc.Index(PINECONE_INDEX_NAME)
 
 
 
