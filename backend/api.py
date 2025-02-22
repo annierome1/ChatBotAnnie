@@ -29,3 +29,7 @@ async def chat(request: Request):
     if not message:
         return {"error": "Message parameter is required"}
     return await stream_openai_response(message, session_id)
+
+@app.get("/")
+def home():
+    return {"message": "Welcome to the chatbot API! Use /chat to interact."}
