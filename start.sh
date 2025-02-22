@@ -1,3 +1,3 @@
 #!/bin/bash
-export PYTHONPATH=$(pwd)/backend
+export PYTHONPATH=$PYTHONPATH:/app
 uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8006}
