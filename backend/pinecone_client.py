@@ -2,41 +2,32 @@ import os
 import time
 import asyncio
 from dotenv import load_dotenv
-from pinecone import (
-    Pinecone,
-    ServerlessSpec,
-    CloudProvider,
-    AwsRegion,
-    VectorType
-)
+from pinecone.client import Client, ServlessSpec
 from openai_client import get_query_embedding  # Your async function to get embeddings
 
 load_dotenv()
 
-# Load environment variables
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
-# Initialize Pinecone client
-pc = Pinecone(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+# Initialize the Pinecone client
+client = Client(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
 
 # Create the index if it doesn't exist
-pc = Pinecone(api_key='YOUR_API_KEY')
+if PINECONE_INDEX_NAME not in client.list_indexes():
+    try:
+        client.create_index(
+            name=PINECONE_INDEX_NAME,
+            dimension=1536,  # for text-embedding-ada-002
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        )
+    except Exception as e:
+        print("Error creating index:", e)
 
-# 2. Create an index
-index_config = pc.create_index(
-    name="index-name",
-    dimension=1536,
-    spec=ServerlessSpec(
-        cloud=CloudProvider.AWS,
-        region=AwsRegion.US_EAST_1
-    ),
-    vector_type=VectorType.DENSE
-)
-
-# 3. Instantiate an Index client
-idx = pc.Index(host=index_config.host)
+# Get a reference to the index
+index = client.Index(PINECONE_INDEX_NAME)
 
 async def store_conversation(user_query, bot_response, session_id):
     """Stores chat history under a session ID in Pinecone."""
