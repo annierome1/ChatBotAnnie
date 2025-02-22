@@ -1,8 +1,11 @@
 import os
 import time
 from pinecone import Pinecone
-from openai_client import get_query_embedding
+from backend.openai_client import get_query_embedding
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Load environment variables
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")

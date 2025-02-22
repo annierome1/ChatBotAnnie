@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Request
 from starlette.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from chatbot import stream_openai_response
+from backend.chatbot import stream_openai_response
 import os
 import uuid
+from dotenv import load_dotenv
 
 
+load_dotenv()
 
 app = FastAPI()
 
