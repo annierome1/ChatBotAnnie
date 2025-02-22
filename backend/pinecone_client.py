@@ -1,7 +1,7 @@
 import os
 import time
 from pinecone import Pinecone
-from backend.openai_client import get_query_embedding
+from openai_client import get_query_embedding
 import asyncio
 from dotenv import load_dotenv
 

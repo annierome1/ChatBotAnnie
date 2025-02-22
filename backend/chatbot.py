@@ -1,5 +1,5 @@
-from backend.openai_client import get_openai_response
-from backend.pinecone_client import search_pinecone, store_conversation
+from openai_client import get_openai_response
+from pinecone_client import search_pinecone, store_conversation
 from starlette.responses import StreamingResponse
 
 async def stream_openai_response(query, session_id):
