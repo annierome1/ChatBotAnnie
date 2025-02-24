@@ -50,7 +50,7 @@ async def search_pinecone(query):
     query_embedding = await get_query_embedding(query)
 
     results = await asyncio.to_thread(
-        index.query, vector=query_embedding, top_k=5, include_metadata=True
+        index.query, vector=query_embedding, top_k=3, include_metadata=True
     )
 
     retrieved_texts = [match["metadata"].get("text", "No relevant text found.") for match in results["matches"]]

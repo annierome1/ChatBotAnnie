@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
 
 
 async def get_query_embedding(query):
@@ -29,3 +28,15 @@ async def get_openai_response(prompt):
         stream=True
     )
     return response_stream
+async def get_openai_chatcompletion_nonstream(messages, model="gpt-4"):
+    """
+    Calls OpenAI's ChatCompletion endpoint WITHOUT streaming,
+    returning the full response as a string.
+    """
+    client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        stream=False
+    )
+    return response.choices[0].message.content
