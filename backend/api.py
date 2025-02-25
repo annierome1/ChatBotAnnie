@@ -15,7 +15,7 @@ app = FastAPI()
 # Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.anniecaroline.com/"],  # Update this with Railway frontend URL after deployment
+    allow_origins=["https://www.anniecaroline.com"],  # Update this with Railway frontend URL after deployment
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
