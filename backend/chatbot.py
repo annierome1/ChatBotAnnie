@@ -5,8 +5,8 @@ from openai_client import (
     get_openai_response,               # streaming
     get_openai_chatcompletion_nonstream  # non-streaming
 )
-from pinecone_client import search_pinecone  # or wherever you keep this
-# Also import or define store_conversation(...) if you have it
+from pinecone_client import search_pinecone
+
 
 async def clarify_user_query(original_query: str) -> str:
     """
@@ -37,22 +37,16 @@ async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
     ]
     summary = await get_openai_chatcompletion_nonstream(messages)
     return summary.strip()
-# chatbot.py (continued)
+
 
 async def stream_openai_response(query, session_id):
-    """
-    Streams OpenAI's response chunk by chunk using a tiered approach:
-      1) Clarify the user query (quick non-streaming).
-      2) Retrieve from Pinecone using clarified query.
-      3) Summarize the Pinecone results (quick non-streaming).
-      4) Stream final answer with condensed context.
-    """
+
     # Step 1: Clarify query
     clarified_query = await clarify_user_query(query)
 
     # Step 2: Search Pinecone for relevant info
     pinecone_info = await search_pinecone(clarified_query)
-    # pinecone_info is presumably a string or joined chunks
+
 
     # Step 3: Summarize the retrieved info
     summary = await summarize_context(clarified_query, pinecone_info)
@@ -83,7 +77,7 @@ async def stream_openai_response(query, session_id):
                 text = chunk.choices[0].delta.content
                 if text:
                     collected_response += text
-                    yield text  # stream to the user as soon as we get it
+                    yield text
 
         # After streaming is done, store the conversation
         await store_conversation(query, collected_response, session_id)

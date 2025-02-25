@@ -18,7 +18,6 @@ index = pc.Index(PINECONE_INDEX_NAME)
 
 async def store_conversation(user_query, bot_response, session_id):
     """Stores chat history under a session ID in Pinecone."""
-
     query_embedding = await get_query_embedding(user_query)
     response_embedding = await get_query_embedding(bot_response)
 
