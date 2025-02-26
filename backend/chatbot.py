@@ -1,4 +1,6 @@
 # chatbot.py
+import logging
+import time
 from pinecone_client import store_conversation
 from fastapi.responses import StreamingResponse
 from openai_client import (
@@ -7,16 +9,20 @@ from openai_client import (
 )
 from pinecone_client import search_pinecone
 
+logging.basicConfig(level=logging.INFO)
 
 async def clarify_user_query(original_query: str) -> str:
     """
     Makes a quick, non-streaming call to restate or clarify the user's query.
     """
+    start_time = time.time()
     messages = [
         {"role": "system", "content": "You are a helpful AI that restates user questions."},
         {"role": "user", "content": f"Please restate or clarify the following query: {original_query}"}
     ]
     clarified = await get_openai_chatcompletion_nonstream(messages)
+    end_time = time.time()
+    logging.info(f"Query clarification took {end_time - start_time: .4f} seconds.")
     return clarified.strip()
 
 async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
@@ -24,6 +30,7 @@ async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
     Makes a quick, non-streaming call to summarize the Pinecone context
     so the final prompt can be concise.
     """
+    start_time = time.time()
     messages = [
         {"role": "system", "content": "You are an expert summarizer."},
         {
@@ -36,20 +43,31 @@ async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
         }
     ]
     summary = await get_openai_chatcompletion_nonstream(messages)
+    end_time = time.time()
+    logging.info(f"Context summarization: {end_time - start_time:.4f} seconds.")
     return summary.strip()
 
 
 async def stream_openai_response(query, session_id):
 
     # Step 1: Clarify query
+    start_time = time.time()
     clarified_query = await clarify_user_query(query)
+    end_time = time.time()
+    logging.info(f"Total time for query clarification: {end_time - start_time:.4f} seconds.")
 
     # Step 2: Search Pinecone for relevant info
+    start_time = time.time()
     pinecone_info = await search_pinecone(clarified_query)
+    end_time = time.time()
+    logging.info(f"Pinecone search took: {end_time - start_time:.4f} seconds.")
 
 
     # Step 3: Summarize the retrieved info
+    start_time = time.time()
     summary = await summarize_context(clarified_query, pinecone_info)
+    end_time = time.time()
+    logging.info(f"otal time for summarization: {end_time - start_time:.4f} seconds.")
 
     # Step 4: Build final prompt and stream the final answer
     final_prompt = f"""
@@ -66,8 +84,10 @@ async def stream_openai_response(query, session_id):
     """
 
     # Use your existing streaming call:
+    start_time = time.time()
     response_stream = await get_openai_response(final_prompt)
-
+    end_time = time.time()
+    logging.info(f"Time taken to start OpenAI response streaming: {end_time - start_time:.4f} seconds.")
     collected_response = ""
 
     async def event_stream():
@@ -80,6 +100,11 @@ async def stream_openai_response(query, session_id):
                     yield text
 
         # After streaming is done, store the conversation
+        start_time = time.time()
         await store_conversation(query, collected_response, session_id)
+        end_time = time.time()
+        logging.info(f"Time taken to store convo: {end_time - start_time:.4f} seconds.")
 
+    end_time = time.time()
+    logging.info(f"Total request processing time: {end_time - start_time:.4f} seconds.")
     return StreamingResponse(event_stream(), media_type="text/event-stream")

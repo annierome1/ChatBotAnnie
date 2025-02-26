@@ -11,11 +11,11 @@ import sys
 load_dotenv()
 
 app = FastAPI()
-
+origins = ["http://localhost:3001/", "https://www.anniecaroline.com/"]
 # Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://www.anniecaroline.com"],
+    allow_origins= origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
