@@ -1,6 +1,6 @@
 import os
 import time
-from pinecone import Pinecone
+import pinecone
 from openai_client import get_query_embedding
 import asyncio
 from dotenv import load_dotenv
@@ -12,8 +12,8 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
 # Initialize Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(PINECONE_INDEX_NAME)
+pinecone.init(api_key=PINECONE_API_KEY, environment="us-east-1-aws")
+index = pinecone.Index(PINECONE_INDEX_NAME)
 
 
 async def store_conversation(user_query, bot_response, session_id):
