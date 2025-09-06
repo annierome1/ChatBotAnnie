@@ -5,7 +5,7 @@ from pinecone_client import store_conversation
 from fastapi.responses import StreamingResponse
 from openai_client import (
     get_openai_chatcompletion_nonstream,  # non-streaming
-    stream_chat_with_messages             # <-- NEW: streaming with messages
+    stream_chat_with_messages             # streaming with messages
 )
 from pinecone_client import search_pinecone
 
@@ -115,6 +115,7 @@ async def stream_openai_response(query, session_id):
 
     except Exception as e:
         logging.error(f"Error in stream_openai_response: {e}")
+        error_message = str(e)
         async def error_stream():
-            yield f"Error: {e}"
+            yield f"Error: {error_message}"
         return StreamingResponse(error_stream(), media_type="text/event-stream")
