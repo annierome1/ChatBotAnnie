@@ -97,21 +97,14 @@ async def stream_openai_response(query, session_id):
                         text = chunk.choices[0].delta.content
                         if text:
                             collected_response += text
-                            yield text
+                            # Format as proper SSE
+                            yield f"data: {text}\n\n"
             except Exception as e:
                 logging.error(f"Error during response streaming: {e}")
-                yield f"\nError during response streaming: {e}"
+                yield f"data: Error during response streaming: {e}\n\n"
 
-            # Save conversation (unchanged; stored under namespace='conversations')
-            try:
-                start_time = time.time()
-                await store_conversation(query, collected_response, session_id)
-                logging.info(f"Time taken to store convo: {time.time() - start_time:.4f} seconds.")
-            except Exception as e:
-                logging.error(f"Error storing conversation: {e}")
-
-        logging.info("Starting to stream response to client.")
-        return StreamingResponse(event_stream(), media_type="text/event-stream")
+            # Send completion signal
+            yield "data: [DONE]\n\n"
 
     except Exception as e:
         logging.error(f"Error in stream_openai_response: {e}")
