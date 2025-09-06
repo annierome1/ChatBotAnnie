@@ -15,26 +15,13 @@ origins = ["http://localhost:3001", "http://localhost:5001", "https://www.anniec
 # Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins= origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 session_id = str(uuid.uuid4())
-
-@app.options("/chat")
-async def chat_options():
-    """Handle CORS preflight requests for /chat endpoint"""
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "600",
-        }
-    )
 
 @app.post("/chat")
 async def chat(request: Request):
