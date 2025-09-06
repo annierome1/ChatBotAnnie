@@ -56,3 +56,30 @@ def debug():
         "files": os.listdir("."),
         "pythonpath": sys.path
     }
+@app.post("/chat-simple")
+async def chat_simple(request: Request):
+    try:
+        data = await request.json()
+        message = data.get("message", "")
+        if not message:
+            return {"error": "Message parameter is required"}
+        
+        # Test basic functionality without streaming
+        from chatbot import clarify_user_query, search_pinecone, summarize_context
+        from openai_client import get_openai_chatcompletion_nonstream
+        
+        clarified = await clarify_user_query(message)
+        joined_text, matches = await search_pinecone(clarified, top_k=3)
+        curated = await summarize_context(clarified, joined_text)
+        
+        # Simple non-streaming response
+        messages = [
+            {"role": "system", "content": "You are Annie, a friendly developer. Keep responses concise."},
+            {"role": "user", "content": f"Context: {curated}\n\nUser: {clarified}"}
+        ]
+        
+        response = await get_openai_chatcompletion_nonstream(messages)
+        return {"response": response}
+        
+    except Exception as e:
+        return {"error": f"Error: {str(e)}"}
