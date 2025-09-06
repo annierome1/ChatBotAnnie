@@ -1,101 +1,92 @@
+# chatbot.py
 import logging
 import time
 from pinecone_client import store_conversation
 from fastapi.responses import StreamingResponse
 from openai_client import (
-    get_openai_response,  # streaming
-    get_openai_chatcompletion_nonstream  # non-streaming
+    get_openai_chatcompletion_nonstream,  # non-streaming
+    stream_chat_with_messages             # <-- NEW: streaming with messages
 )
 from pinecone_client import search_pinecone
 
 logging.basicConfig(level=logging.INFO)
 
+VOICE_SYSTEM_PROMPT = (
+    "You are Annie, a friendly, direct, practical full-stack dev with a a love for clean design. "
+    "Voice: warm but concise; avoid filler."
+    "No links or email addresses. Do not invent clients/employers or facts not in the provided context. "
+    "If the context is insufficient, say so briefly and offer the next step."
+)
+
+GROUNDING_RULES = (
+    "Use only the facts from the retrieved context unless the user asks for general guidance. "
+    "If a question is about Annie, answer in first person. "
+    "For technical how-tos, be clear and actionable. "
+    "Target 2–6 sentences unless the user asks for more detail."
+)
+def _route_types(clarified: str) -> list[str] | None:
+    q = clarified.lower()
+    # Route common intents to metadata types
+    if any(w in q for w in ["project", "portfolio", "built", "site", "app", "extension"]):
+        return ["project"]
+    if any(w in q for w in ["who are you", "about you", "bio", "background"]):
+        return ["voice_profile", "bio", "qa_persona", "pitch"]
+    if any(w in q for w in ["email", "dm", "message", "reach out", "referral"]):
+        return ["comms_samples", "style_pair"]
+    # default: no filter
+    return None
 
 async def clarify_user_query(original_query: str) -> str:
-    """
-    Makes a quick, non-streaming call to restate or clarify the user's query.
-    """
-    start_time = time.time()
+    # (unchanged)
     messages = [
         {"role": "system", "content": "You are a helpful AI that restates user questions."},
         {"role": "user", "content": f"Please restate or clarify the following query: {original_query}"}
     ]
-    try:
-        clarified = await get_openai_chatcompletion_nonstream(messages)
-    except Exception as e:
-        logging.error(f"Error in clarify_user_query: {e}")
-        raise e
-    end_time = time.time()
-    logging.info(f"Query clarification took {end_time - start_time:.4f} seconds.")
+    clarified = await get_openai_chatcompletion_nonstream(messages)
     return clarified.strip()
 
-
 async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
-    """
-    Makes a quick, non-streaming call to summarize the Pinecone context
-    so the final prompt can be concise.
-    """
-    start_time = time.time()
+    # (unchanged but with slightly stronger instruction)
     messages = [
         {"role": "system", "content": "You are an expert summarizer."},
-        {
-            "role": "user",
-            "content": (
-                f"User Query (clarified): {clarified_query}\n\n"
-                f"Context from Pinecone:\n{pinecone_results}\n\n"
-                "Provide a concise summary or bullet points relevant to answering the query."
-            )
-        }
+        {"role": "user", "content":
+            f"User Query (clarified): {clarified_query}\n\n"
+            f"Context from Pinecone:\n{pinecone_results}\n\n"
+            "Return 3–6 short bullets that are MOST relevant to answering the query. "
+            "If the query is about projects, focus only on project documents. "
+            "If the query is about Annie generally, emphasize voice/bio/QA."}
     ]
-    try:
-        summary = await get_openai_chatcompletion_nonstream(messages)
-    except Exception as e:
-        logging.error(f"Error in summarize_context: {e}")
-        raise e
-    end_time = time.time()
-    logging.info(f"Context summarization took {end_time - start_time:.4f} seconds.")
+    summary = await get_openai_chatcompletion_nonstream(messages)
     return summary.strip()
-
 
 async def stream_openai_response(query, session_id):
     try:
-        # Step 1: Clarify query
-        start_time = time.time()
-        clarified_query = await clarify_user_query(query)
-        end_time = time.time()
-        logging.info(f"Total time for query clarification: {end_time - start_time:.4f} seconds.")
+        clarified = await clarify_user_query(query)
 
-        # Step 2: Search Pinecone for relevant info
-        start_time = time.time()
-        pinecone_info = await search_pinecone(clarified_query)
-        end_time = time.time()
-        logging.info(f"Pinecone search took: {end_time - start_time:.4f} seconds.")
+        # ROUTE: ask Pinecone for the right types first
+        desired_types = _route_types(clarified)
+        joined_text, matches = await search_pinecone(
+            clarified,
+            top_k=8,
+            types=desired_types  # <= key change: filter by type when we can
+        )
 
-        # Step 3: Summarize the retrieved info
-        start_time = time.time()
-        summary = await summarize_context(clarified_query, pinecone_info)
-        end_time = time.time()
-        logging.info(f"Total time for summarization: {end_time - start_time:.4f} seconds.")
+        # If filtering came back too thin, do a small backfill without filter
+        if len(matches) < 2 and desired_types:
+            extra_text, extra_matches = await search_pinecone(clarified, top_k=6, types=None)
+            joined_text = (joined_text + "\n" + extra_text).strip()
+            matches += extra_matches
 
-        # Step 4: Build final prompt and stream the final answer
-        final_prompt = f"""
-        You are a chatbot trained on personal and professional information about Annie. Respond to questions as if you are Annie, but don't make it sound fake. Focus on her work as an aspiring full-stack developer.
-        - For technical questions: provide clear, concise explanations and include brief examples or analogies if needed.
-        - For general questions: keep your response high-level and engaging.
-        Don't hallucinate too much, use data from summary.
-        Ensure your response is clear, contains no more than 4 sentences. Make sound personable, as if someone is actually talking to a young professional in their early 20s. Avoid slang, filler content, and do not include any email addresses or website links.
+        curated = await summarize_context(clarified, joined_text)
 
-        Background summary:
-        {summary}
+        messages = [
+            {"role": "system", "content": VOICE_SYSTEM_PROMPT},
+            {"role": "system", "content": GROUNDING_RULES},
+            {"role": "system", "content": f"Context (summarized):\n{curated}"},
+            {"role": "user", "content": clarified}
+        ]
 
-        User query:
-        {query}
-        """
-
-        start_time = time.time()
-        response_stream = await get_openai_response(final_prompt)
-        end_time = time.time()
-        logging.info(f"Time taken to start OpenAI response streaming: {end_time - start_time:.4f} seconds.")
+        response_stream = await stream_chat_with_messages(messages)
         collected_response = ""
 
         async def event_stream():
@@ -111,12 +102,11 @@ async def stream_openai_response(query, session_id):
                 logging.error(f"Error during response streaming: {e}")
                 yield f"\nError during response streaming: {e}"
 
-            # After streaming is done, store the conversation
+            # Save conversation (unchanged; stored under namespace='conversations')
             try:
                 start_time = time.time()
                 await store_conversation(query, collected_response, session_id)
-                end_time = time.time()
-                logging.info(f"Time taken to store convo: {end_time - start_time:.4f} seconds.")
+                logging.info(f"Time taken to store convo: {time.time() - start_time:.4f} seconds.")
             except Exception as e:
                 logging.error(f"Error storing conversation: {e}")
 
@@ -125,8 +115,6 @@ async def stream_openai_response(query, session_id):
 
     except Exception as e:
         logging.error(f"Error in stream_openai_response: {e}")
-
         async def error_stream():
             yield f"Error: {e}"
-
         return StreamingResponse(error_stream(), media_type="text/event-stream")
