@@ -45,13 +45,60 @@ async def store_conversation(user_query, bot_response, session_id):
         print(f"Error storing conversation in Pinecone: {e}")
 
 
-async def search_pinecone(query):
+def _build_filter(types=None, audience=None, project=None):
+    f = {}
+    if types:
+        types = list(types)
+        f["type"] = {"$eq": types[0]} if len(types) == 1 else {"$in": types}
+    if audience:
+        f["audience"] = {"$eq": audience}
+    if project:
+        f["project"] = {"$eq": project}
+    return f or None
+
+async def search_pinecone(
+    query: str,
+    top_k: int = 8,
+    types: list[str] | None = None,
+    audience: str | None = None,
+    project: str | None = None,
+    namespace: str = "public"
+):
+    """
+    Vector search with optional metadata filtering.
+    Returns both a joined text block and raw matches for debugging/reranking.
+    """
     query_embedding = await get_query_embedding(query)
 
+    pinecone_filter = _build_filter(types=types, audience=audience, project=project)
+
     results = await asyncio.to_thread(
-        index.query, vector=query_embedding, top_k=3, include_metadata=True
+        index.query,
+        vector=query_embedding,
+        top_k=top_k,
+        include_metadata=True,
+        namespace=namespace,
+        filter=pinecone_filter
     )
 
-    retrieved_texts = [match["metadata"].get("text", "No relevant text found.") for match in results["matches"]]
-    print("\n Pinecone data: \n", retrieved_texts, "\n")
-    return "\n".join(retrieved_texts)
+    matches = results.get("matches", []) or []
+    retrieved = []
+    for m in matches:
+        md = m.get("metadata", {}) or {}
+        retrieved.append({
+            "id": m.get("id"),
+            "score": m.get("score"),
+            "type": md.get("type"),
+            "project": md.get("project"),
+            "audience": md.get("audience"),
+            "text": md.get("text", "No relevant text found.")
+        })
+
+    # Keep your original behavior (return a big string), but also return matches for logging.
+    joined_text = "\n".join(item["text"] for item in retrieved)
+    # Helpful debug print to see *what* you got back:
+    print("\n Pinecone matches (type, project, score, id):")
+    for item in retrieved:
+        print(f"  - {item['type']}, {item['project']}, {item['score']:.3f}, {item['id']}")
+    print()
+    return joined_text, retrieved

@@ -12,7 +12,7 @@ async def get_query_embedding(query):
     client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
     response = await client.embeddings.create(
         input=query,
-        model="text-embedding-ada-002"
+        model="text-embedding-3-small"
     )
     return response.data[0].embedding
 
@@ -28,6 +28,7 @@ async def get_openai_response(prompt):
         stream=True
     )
     return response_stream
+
 async def get_openai_chatcompletion_nonstream(messages, model="gpt-4"):
     """
     Calls OpenAI's ChatCompletion endpoint WITHOUT streaming,
@@ -40,3 +41,17 @@ async def get_openai_chatcompletion_nonstream(messages, model="gpt-4"):
         stream=False
     )
     return response.choices[0].message.content
+
+# openai_client.py
+
+async def stream_chat_with_messages(messages, model="gpt-4"):
+    """
+    Streaming chat completion that accepts full message arrays,
+    so we can anchor a custom system prompt.
+    """
+    client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+    return await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        stream=True
+    )
