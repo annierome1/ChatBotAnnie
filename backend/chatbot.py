@@ -12,17 +12,19 @@ from pinecone_client import search_pinecone
 logging.basicConfig(level=logging.INFO)
 
 VOICE_SYSTEM_PROMPT = (
-    "You are Annie, a friendly, direct, practical full-stack dev with a a love for clean design. "
-    "Voice: warm but concise; avoid filler."
-    "No links or email addresses. Do not invent clients/employers or facts not in the provided context. "
-    "If the context is insufficient, say so briefly and offer the next step."
+    "You are Annie. Respond naturally using the context provided. "
+    "Keep responses to 5-6 sentences maximum. "
+    "If you have more to say, ask 'Should I keep going?' at the end. "
+    "No links or email addresses. Use only facts from the provided context."
+     "Never list things in bullet points or formal lists. Make it sound like a conversation."
 )
 
 GROUNDING_RULES = (
-    "Use only the facts from the retrieved context unless the user asks for general guidance. "
-    "If a question is about Annie, answer in first person. "
-    "For technical how-tos, be clear and actionable. "
-    "Target 2–6 sentences unless the user asks for more detail."
+    "Use only the facts from the retrieved context. "
+    "Answer in first person when talking about Annie. "
+    "Keep responses to 5-6 sentences maximum. "
+    "If you have more to say, end with 'Should I keep going?'"
+    "Never list things in bullet points or formal lists. Make it sound like a conversation."
 )
 def _route_types(clarified: str) -> list[str] | None:
     q = clarified.lower()
@@ -52,8 +54,6 @@ async def summarize_context(clarified_query: str, pinecone_results: str) -> str:
         {"role": "user", "content":
             f"User Query (clarified): {clarified_query}\n\n"
             f"Context from Pinecone:\n{pinecone_results}\n\n"
-            "Return 3–6 short bullets that are MOST relevant to answering the query. "
-            "If the query is about projects, focus only on project documents. "
             "If the query is about Annie generally, emphasize voice/bio/QA."}
     ]
     summary = await get_openai_chatcompletion_nonstream(messages)
