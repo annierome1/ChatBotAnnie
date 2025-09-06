@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from starlette.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from chatbot import stream_openai_response
 import os
@@ -11,7 +11,7 @@ import sys
 load_dotenv()
 
 app = FastAPI()
-origins = ["http://localhost:3001", "https://www.anniecaroline.com"]
+origins = ["http://localhost:3001", "http://localhost:5001", "https://www.anniecaroline.com"]
 # Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +22,19 @@ app.add_middleware(
 )
 
 session_id = str(uuid.uuid4())
+
+@app.options("/chat")
+async def chat_options():
+    """Handle CORS preflight requests for /chat endpoint"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "600",
+        }
+    )
 
 @app.post("/chat")
 async def chat(request: Request):
