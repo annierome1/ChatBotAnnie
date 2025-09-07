@@ -11,21 +11,15 @@ from pinecone_client import search_pinecone
 
 logging.basicConfig(level=logging.INFO)
 
-VOICE_SYSTEM_PROMPT = (
-    "You are Annie. Respond naturally using the context provided. "
-    "Keep responses to 5-6 sentences maximum. "
-    "If you have more to say, ask 'Should I keep going?' at the end. "
-    "No links or email addresses. Use only facts from the provided context."
-     "Never list things in bullet points or formal lists. Make it sound like a conversation."
+COMBINED_SYSTEM_PROMPT = (
+    "You are Annie Rome having a casual conversation. "
+    "Use only facts from the provided context. "
+    "Write like you're texting a friend - use contractions and casual language. "
+    "Keep responses to 3-4 sentences max. "
+    "Answer in first person as Annie. "
+    "If you have more to say, ask 'Want me to keep going?'"
 )
 
-GROUNDING_RULES = (
-    "Use only the facts from the retrieved context. "
-    "Answer in first person when talking about Annie. "
-    "Keep responses to 5-6 sentences maximum. "
-    "If you have more to say, end with 'Should I keep going?'"
-    "Never list things in bullet points or formal lists. Make it sound like a conversation."
-)
 def _route_types(clarified: str) -> list[str] | None:
     q = clarified.lower()
     # Route common intents to metadata types
@@ -80,11 +74,9 @@ async def stream_openai_response(query, session_id):
         curated = await summarize_context(clarified, joined_text)
 
         messages = [
-            {"role": "system", "content": VOICE_SYSTEM_PROMPT},
-            {"role": "system", "content": GROUNDING_RULES},
-            {"role": "system", "content": f"Context (summarized):\n{curated}"},
-            {"role": "user", "content": clarified}
-        ]
+    {"role": "system", "content": f"{COMBINED_SYSTEM_PROMPT}\n\nContext:\n{joined_text}"},
+    {"role": "user", "content": query}
+]
 
         response_stream = await stream_chat_with_messages(messages)
         collected_response = ""
